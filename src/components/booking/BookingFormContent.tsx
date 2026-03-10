@@ -11,18 +11,7 @@ import toast from "react-hot-toast";
 import { Shield, Lock, Calendar, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
-// Razorpay types
-interface RazorpayInstance {
-  open(): void;
-}
-interface RazorpayConstructor {
-  new (options: Record<string, unknown>): RazorpayInstance;
-}
-declare global {
-  interface Window {
-    Razorpay?: RazorpayConstructor;
-  }
-}
+
 
 const FALLBACK_ROOMS: Record<string, Room> = {
   "1": {
@@ -56,7 +45,6 @@ export default function BookingFormContent({ roomId }: { roomId: string }) {
 
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
 
   // Form state
   const [name, setName] = useState("");
@@ -102,99 +90,14 @@ export default function BookingFormContent({ roomId }: { roomId: string }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!room || !user) return;
     if (!name || !email || !phone) {
       toast.error("Please fill all required fields");
       return;
     }
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/create-booking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          roomId: room.id,
-          roomName: room.name,
-          roomImage: room.images[0],
-          roomCategory: room.category,
-          userId: user.uid,
-          userEmail: email,
-          userName: name,
-          userPhone: phone,
-          checkIn: checkInStr,
-          checkOut: checkOutStr,
-          guests,
-          nights,
-          pricePerNight: room.price,
-          totalAmount: total,
-          specialRequests,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || "Booking failed");
-
-      // Open Razorpay
-      const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: data.amount,
-        currency: data.currency,
-        name: "GreenView Hotels",
-        description: `${room.name} — ${nights} nights`,
-        order_id: data.orderId,
-        prefill: { name, email, contact: phone },
-        theme: { color: "#C9A96E" },
-        handler: async (response: {
-          razorpay_payment_id: string;
-          razorpay_order_id: string;
-          razorpay_signature: string;
-        }) => {
-          const verifyRes = await fetch("/api/verify-payment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              bookingId: data.bookingId,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
-          const verifyData = await verifyRes.json();
-          if (verifyData.success) {
-            toast.success("Booking confirmed!");
-            router.push(`/booking-confirmation/${data.bookingId}`);
-          } else {
-            toast.error("Payment verification failed");
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            toast.error("Payment cancelled");
-            setSubmitting(false);
-          },
-        },
-      };
-
-      // Load Razorpay script
-      if (!(window as Window & { Razorpay?: unknown }).Razorpay) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = "https://checkout.razorpay.com/v1/checkout.js";
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error("Razorpay load failed"));
-          document.head.appendChild(script);
-        });
-      }
-
-      const RazorpayClass = window.Razorpay!;
-      const rzp = new RazorpayClass(options as Record<string, unknown>);
-      rzp.open();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Something went wrong";
-      toast.error(msg);
-      setSubmitting(false);
-    }
+    toast("Online payments coming soon! Please contact us to complete your reservation.", {
+      icon: "🏨",
+      duration: 5000,
+    });
   };
 
   if (authLoading || loading) {
@@ -329,14 +232,14 @@ export default function BookingFormContent({ roomId }: { roomId: string }) {
                 </div>
               </div>
 
-              {/* Security Note */}
+              {/* Info Note */}
               <div className="flex items-start gap-3 bg-forest/5 border border-forest/10 p-4">
                 <Shield className="w-5 h-5 text-forest shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-sans text-sm font-medium text-forest mb-1">Secure Booking</p>
+                  <p className="font-sans text-sm font-medium text-forest mb-1">Reservation Enquiry</p>
                   <p className="font-sans text-xs text-charcoal-light/60 leading-loose">
-                    Your payment is processed securely by Razorpay. We never store
-                    your card details. Free cancellation up to 48 hours before check-in.
+                    Online payments are coming soon. Submit your details and our team
+                    will reach out to confirm your stay. Free cancellation up to 48 hours before check-in.
                   </p>
                 </div>
               </div>
@@ -344,11 +247,10 @@ export default function BookingFormContent({ roomId }: { roomId: string }) {
               <button
                 type="submit"
                 id="proceed-to-payment-btn"
-                disabled={submitting}
-                className="btn-solid w-full justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="btn-solid w-full justify-center gap-3"
               >
                 <Lock className="w-4 h-4" />
-                {submitting ? "Processing..." : `Pay ${formatCurrency(total)} Securely`}
+                Request Reservation &mdash; {formatCurrency(total)}
               </button>
             </form>
           </div>
