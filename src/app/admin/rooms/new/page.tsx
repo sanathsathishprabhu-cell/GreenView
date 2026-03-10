@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import RoomForm from "@/components/admin/RoomForm";
 import type { Metadata } from "next";
 
